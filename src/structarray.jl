@@ -106,8 +106,8 @@ _structarray(args::Tuple, ::Tuple) = _structarray(args, nothing)
 _structarray(args::NTuple{N, Any}, names::NTuple{N, Symbol}) where {N} = StructArray(NamedTuple{names}(args))
 
 const StructVector{T, C<:Tup, I} = StructArray{T, 1, C, I}
-StructVector{T}(args...; kwargs...) where {T} = StructArray{T}(args...; kwargs...)
-StructVector(args...; kwargs...) = StructArray(args...; kwargs...)
+StructVector{T}(args::Vararg{Any,K}; kwargs...) where {K,T} = StructArray{T}(args...; kwargs...)
+StructVector(args::Vararg{Any,K}; kwargs...) where {K} = StructArray(args...; kwargs...)
 
 function Base.IndexStyle(::Type{S}) where {S<:StructArray}
     index_type(S) === Int ? IndexLinear() : IndexCartesian()
@@ -266,12 +266,12 @@ to
 map(c -> c[I...], Tuple(cols))
 ```
 """
-get_ith(cols::NamedTuple, I...) = get_ith(Tuple(cols), I...)
-function get_ith(cols::Tuple, I...)
+@inline get_ith(cols::NamedTuple, I::Vararg{Any,K}) where {K} = get_ith(Tuple(cols), I...)
+@inline function get_ith(cols::Tuple, I::Vararg{Any,K}) where {K}
     @inbounds r = first(cols)[I...]
     return (r, get_ith(Base.tail(cols), I...)...)
 end
-get_ith(::Tuple{}, I...) = ()
+@inline get_ith(::Tuple{}, I::Vararg{Any,K}) where {K} = ()
 
 Base.@propagate_inbounds function Base.getindex(x::StructArray{T, <:Any, <:Any, CartesianIndex{N}}, I::Vararg{Int, N}) where {T, N}
     cols = fieldarrays(x)
@@ -285,8 +285,16 @@ Base.@propagate_inbounds function Base.getindex(x::StructArray{T, <:Any, <:Any, 
     return createinstance(T, get_ith(cols, I)...)
 end
 
-function Base.view(s::StructArray{T, N, C}, I...) where {T, N, C}
-    StructArray{T}(map(v -> view(v, I...), fieldarrays(s)))
+@generated function StructArrays.view(s::StructArray{T, N, C}, I::Vararg{Any,K}) where {T, N, C, K}
+
+    y = fieldnames(C)
+    data = [:(view(@inbounds(arrays[$i]), I...)) for i = 1:length(y)]
+
+    quote
+        $(Expr(:meta, :inline))
+        arrays = StructArrays.fieldarrays(s)
+        StructArray{$T}(NamedTuple{$y}(tuple($(data...))))
+    end
 end
 
 Base.@propagate_inbounds function Base.setindex!(s::StructArray{<:Any, <:Any, <:Any, CartesianIndex{N}}, vals, I::Vararg{Int, N}) where {N}
@@ -365,9 +373,9 @@ import Base.Broadcast: BroadcastStyle, ArrayStyle, AbstractArrayStyle, Broadcast
 
 struct StructArrayStyle{Style} <: AbstractArrayStyle{Any} end
 
-@inline combine_style_types(::Type{A}, args...) where A<:AbstractArray =
+@inline combine_style_types(::Type{A}, args::Vararg{Any,K}) where {A<:AbstractArray,K} =
     combine_style_types(BroadcastStyle(A), args...)
-@inline combine_style_types(s::BroadcastStyle, ::Type{A}, args...) where A<:AbstractArray =
+@inline combine_style_types(s::BroadcastStyle, ::Type{A}, args::Vararg{Any,K}) where {A<:AbstractArray,K} =
     combine_style_types(Broadcast.result_style(s, BroadcastStyle(A)), args...)
 combine_style_types(s::BroadcastStyle) = s
 

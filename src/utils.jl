@@ -94,7 +94,7 @@ end
 @generated foreachfield_gen(::S, f, xs::Vararg{Any, L}) where {S<:StructArray, L} =
     _foreachfield(array_names_types(S), L)
 
-foreachfield(f, x::StructArray, xs...) = foreachfield_gen(x, f, x, xs...)
+foreachfield(f, x::StructArray, xs::Vararg{Any,K}) where {K} = foreachfield_gen(x, f, x, xs...)
 
 """
     StructArrays.iscompatible(::Type{S}, ::Type{V}) where {S, V<:AbstractArray}
