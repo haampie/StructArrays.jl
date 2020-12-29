@@ -285,7 +285,7 @@ Base.@propagate_inbounds function Base.getindex(x::StructArray{T, <:Any, <:Any, 
     return createinstance(T, get_ith(cols, I)...)
 end
 
-@generated function StructArrays.view(s::StructArray{T, N, C}, I::Vararg{Any,K}) where {T, N, C, K}
+@generated function StructArrays.view(s::StructArray{T, N, C}, I::Vararg{Any,K}) where {T, N, C<:NamedTuple, K}
 
     y = fieldnames(C)
     data = [:(view(@inbounds(arrays[$i]), I...)) for i = 1:length(y)]
@@ -294,6 +294,18 @@ end
         $(Expr(:meta, :inline))
         arrays = StructArrays.fieldarrays(s)
         StructArray{$T}(NamedTuple{$y}(tuple($(data...))))
+    end
+end
+
+@generated function StructArrays.view(s::StructArray{T, N, C}, I::Vararg{Any,K}) where {T, N, C<:Tuple, K}
+
+    y = fieldnames(C)
+    data = [:(view(@inbounds(arrays[$i]), I...)) for i = 1:length(y)]
+
+    quote
+        $(Expr(:meta, :inline))
+        arrays = StructArrays.fieldarrays(s)
+        StructArray{$T}(tuple($(data...)))
     end
 end
 
